@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Tests du garde-fou hooks/guard.py sur des payloads synthétiques.
-# Usage : tests/guard-tests.sh   (sortie : une ligne PASS/FAIL par cas + total, exit 1 si échec)
+# Tests of the guard hooks/guard.py on synthetic payloads.
+# Usage: tests/guard-tests.sh   (output: one PASS/FAIL line per case + total, exit 1 on failure)
 set -u
 HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
 GUARD="$HOOKS/guard.py"
-# guard.py lit son interrupteur dans le dossier parent du sien (~/.claude une fois installé)
+# guard.py reads its kill switch in the parent of its own folder (~/.claude once installed)
 OFF_FILE="$(dirname "$HOOKS")/guard.off"
 WORK="${TMPDIR:-/tmp}/guard-tests.$$"
 mkdir -p "$WORK"
@@ -28,12 +28,12 @@ check() {
 }
 bash_check() { check "$1" Bash "$(jq -cn --arg c "$2" '{command:$c}')" "${3:-$WORK}"; }
 
-# Dépôts git temporaires : un sur main, un sur feat
+# Temporary git repositories: one on main, one on feat
 git init -q -b main "$WORK/repo-main" && git -C "$WORK/repo-main" commit -q --allow-empty -m init
 git init -q -b feat "$WORK/repo-feat" && git -C "$WORK/repo-feat" commit -q --allow-empty -m init
-PROJ="$HOME/work/projects/myproject"   # profondeur 3 sous le home
+PROJ="$HOME/work/projects/myproject"   # depth 3 under home
 
-echo "== Bash : rm =="
+echo "== Bash: rm =="
 bash_check allow 'ls -la'
 bash_check allow 'rm file.txt'
 bash_check allow 'rm -rf node_modules'
@@ -75,7 +75,7 @@ bash_check deny  'rm -rf /tmp'
 bash_check deny  'rm -rf /usr/local'
 bash_check allow 'rm -rf /opt/homebrew/lib/node_modules/foo'
 
-echo "== Bash : git =="
+echo "== Bash: git =="
 bash_check allow 'git push'
 bash_check allow 'git push origin feat'
 bash_check allow 'git push --force origin feat'
@@ -118,7 +118,7 @@ bash_check allow 'git stash pop'
 bash_check allow 'git commit --amend --no-edit'
 bash_check allow 'git status && git diff'
 
-echo "== Bash : divers =="
+echo "== Bash: misc =="
 bash_check deny  'mkfs.ext4 /dev/sdb'
 bash_check deny  'dd if=/dev/zero of=/dev/disk2 bs=1m'
 bash_check deny  'diskutil eraseDisk JHFS+ X disk2'
@@ -150,15 +150,15 @@ check allow mcp__hostinger__hosting_deployStaticWebsite '{}'
 check allow mcp__plugin_github_github__push_files '{}'
 check allow mcp__jcodemunch__get_symbol '{}'
 
-echo "== Autres outils, escape hatch, entrées invalides =="
+echo "== Other tools, escape hatch, invalid input =="
 check allow Edit '{"file_path":"/x","old_string":"a","new_string":"b"}'
 check allow Read '{"file_path":"/etc/hosts"}'
 touch "$OFF_FILE"
 bash_check allow 'rm -rf ~'
 rm -f "$OFF_FILE"
 bash_check deny  'rm -rf ~'
-out=$(printf '' | python3 "$GUARD"); [ "$out" = "{}" ] && { pass=$((pass+1)); echo "PASS stdin vide -> {}"; } || { fail=$((fail+1)); echo "FAIL stdin vide -> $out"; }
-out=$(printf 'not json' | python3 "$GUARD"); [ "$out" = "{}" ] && { pass=$((pass+1)); echo "PASS stdin invalide -> {}"; } || { fail=$((fail+1)); echo "FAIL stdin invalide -> $out"; }
+out=$(printf '' | python3 "$GUARD"); [ "$out" = "{}" ] && { pass=$((pass+1)); echo "PASS empty stdin -> {}"; } || { fail=$((fail+1)); echo "FAIL empty stdin -> $out"; }
+out=$(printf 'not json' | python3 "$GUARD"); [ "$out" = "{}" ] && { pass=$((pass+1)); echo "PASS invalid stdin -> {}"; } || { fail=$((fail+1)); echo "FAIL invalid stdin -> $out"; }
 
-echo "== TOTAL : $pass PASS, $fail FAIL =="
+echo "== TOTAL: $pass PASS, $fail FAIL =="
 [ "$fail" -eq 0 ]

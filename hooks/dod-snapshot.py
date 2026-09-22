@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 """
-Definition of Done — hook UserPromptSubmit (v2, 2026-09-18).
+Definition of Done: UserPromptSubmit hook (v2, 2026-09-18).
 
-Prend une empreinte de l'état git du projet au moment du prompt utilisateur.
-dod-check.py (hook Stop) la recompare en fin de tour : une empreinte
-différente = mutation, quel que soit le chemin d'édition (Edit/Write, Bash
-sed/heredoc, outils MCP, sous-agents).
+Takes a fingerprint of the project's git state when the user prompt arrives.
+dod-check.py (Stop hook) compares it again at the end of the turn: a different
+fingerprint = a mutation, whatever the editing path (Edit/Write, Bash
+sed/heredoc, MCP tools, subagents).
 
-Empreinte = sha256 de :
+Fingerprint = sha256 of:
   git status --porcelain=v1 --untracked-files=all -z
-  + git diff HEAD --no-color            (dépôt sans commit : git diff)
-  + pour chaque fichier untracked : chemin \\0 taille \\0 mtime_ns
-Hors dépôt git : fingerprint null, dod-check retombe sur le scan du transcript.
+  + git diff HEAD --no-color            (repository without commits: git diff)
+  + for each untracked file: path \\0 size \\0 mtime_ns
+Outside a git repository: null fingerprint, dod-check falls back on the transcript scan.
 
-Stockage : ~/.claude/.tmp/dod/<session_id>.json ; purge des fichiers > 7 jours.
-Ne bloque jamais, n'injecte jamais de contexte : imprime toujours {} et sort 0.
-Sous-processus git limités à 4 s ; toute exception = no-op silencieux.
+Storage: ~/.claude/.tmp/dod/<session_id>.json; files older than 7 days are purged.
+Never blocks, never injects context: always prints {} and exits 0.
+git subprocesses are capped at 4 s; any exception = silent no-op.
 
-Pour débrancher : retirer les deux entrées de hooks (UserPromptSubmit et Stop)
-dans ~/.claude/settings.json puis supprimer dod-snapshot.py et dod-check.py.
+To unplug: remove both hook entries (UserPromptSubmit and Stop)
+from ~/.claude/settings.json, then delete dod-snapshot.py and dod-check.py.
 
-Test manuel :
-  echo '{"session_id":"t","cwd":"/chemin/depot"}' | ./dod-snapshot.py ; cat ~/.claude/.tmp/dod/t.json
+Manual test:
+  echo '{"session_id":"t","cwd":"/path/to/repo"}' | ./dod-snapshot.py ; cat ~/.claude/.tmp/dod/t.json
 """
 import hashlib
 import json
@@ -37,7 +37,7 @@ PURGE_AGE_S = 7 * 86400
 
 
 def safe_session_id(value):
-    """Nom de fichier sûr dérivé du session_id (None si inutilisable)."""
+    """Safe file name derived from the session_id (None if unusable)."""
     if not isinstance(value, str) or not value.strip():
         return None
     return re.sub(r"[^A-Za-z0-9_.-]", "_", value.strip())[:128]
@@ -48,7 +48,7 @@ def snapshot_path(session_id):
 
 
 def _git(cwd, args):
-    """stdout (bytes) d'une commande git ; None si échec, timeout ou git absent."""
+    """stdout (bytes) of a git command; None on failure, timeout or missing git."""
     try:
         result = subprocess.run(
             ["git", "-C", cwd] + args,
@@ -64,7 +64,7 @@ def _git(cwd, args):
 
 
 def compute_fingerprint(cwd):
-    """(toplevel, sha256 hex) ; (None, None) si cwd n'est pas dans un dépôt git."""
+    """(toplevel, sha256 hex); (None, None) if cwd is not inside a git repository."""
     if not cwd or not os.path.isdir(cwd):
         return None, None
     top = _git(cwd, ["rev-parse", "--show-toplevel"])
@@ -77,7 +77,7 @@ def compute_fingerprint(cwd):
     if status is None:
         return toplevel, None
     diff = _git(toplevel, ["diff", "HEAD", "--no-color"])
-    if diff is None:  # dépôt sans commit : HEAD n'existe pas encore
+    if diff is None:  # repository without commits: HEAD does not exist yet
         diff = _git(toplevel, ["diff", "--no-color"]) or b""
     digest = hashlib.sha256()
     digest.update(status)
@@ -143,7 +143,7 @@ def main():
             toplevel, fingerprint = compute_fingerprint(cwd)
             write_snapshot(session_id, cwd, toplevel, fingerprint)
         purge_old_snapshots()
-    except Exception:  # ne jamais gêner le prompt
+    except Exception:  # never get in the way of the prompt
         pass
     sys.stdout.write("{}\n")
     sys.stdout.flush()

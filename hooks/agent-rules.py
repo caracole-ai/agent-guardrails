@@ -1,37 +1,37 @@
 #!/usr/bin/env python3
 """
-Règles harnais — hook SubagentStart (2026-09-22).
+Harness rules: SubagentStart hook (2026-09-22).
 
-Injecte un digest des règles du CLAUDE.md global dans le contexte de chaque
-sous-agent au moment de son lancement. Vérifié le 2026-09-21 : un sous-agent
-(outil Agent : Explore, Plan, general-purpose, agents de plugins…) ne reçoit
-ni ~/.claude/CLAUDE.md ni les directives SessionStart — seulement son system
-prompt d'agent. Sans ce hook, le passage des règles dépend de la mémoire du
-processus parent.
+Injects a digest of the global CLAUDE.md rules into the context of each
+subagent when it starts. Checked on 2026-09-21: a subagent (Agent tool:
+Explore, Plan, general-purpose, plugin agents…) receives neither
+~/.claude/CLAUDE.md nor the SessionStart directives, only its own agent
+system prompt. Without this hook, passing the rules on depends on the parent
+process remembering to.
 
-Choix du digest (règles dans hooks/agent-rules.json, ce script les applique) :
-  - agent_type dans readonly_types -> agent-rules/readonly.md
-      (efficience de recherche : vérifier à la source, conclusion pas dump,
-      s'arrêter dès la réponse, ne rien modifier)
-  - agent_type dans skip_types     -> rien (fork : hérite déjà tout le contexte ;
-      statusline-setup : tâche cadrée)
-  - tout le reste, y compris absent, vide ou inconnu -> agent-rules/mutating.md
-      (règles de code du CLAUDE.md + anti-pattern env + bloc DoD attendu)
-  agent_type = subagent_type de l'appel Agent (payload SubagentStart).
+Digest choice (rules in hooks/agent-rules.json, this script applies them):
+  - agent_type in readonly_types -> agent-rules/readonly.md
+      (research efficiency: check at the source, a conclusion not a dump,
+      stop once answered, change nothing)
+  - agent_type in skip_types     -> nothing (fork: already inherits the whole
+      context; statusline-setup: narrowly scoped task)
+  - everything else, including missing, empty or unknown -> agent-rules/mutating.md
+      (CLAUDE.md coding rules + env anti-pattern + expected DoD block)
+  agent_type = subagent_type of the Agent call (SubagentStart payload).
 
-Sortie : {"hookSpecificOutput": {"hookEventName": "SubagentStart",
-          "additionalContext": <digest>}} — le harnais l'affiche au sous-agent.
-Ne bloque jamais. Digest manquant ou vide, JSON de règles cassé, erreur
-interne : no-op {} et une ligne sur stderr (fail-open, comme guard.py).
+Output: {"hookSpecificOutput": {"hookEventName": "SubagentStart",
+         "additionalContext": <digest>}}; the harness shows it to the subagent.
+Never blocks. Missing or empty digest, broken rules JSON, internal error:
+no-op {} and one line on stderr (fail-open, like guard.py).
 
-Escape hatch (contrôlé par l'humain) :
-  touch ~/.claude/agent-rules.off   -> no-op, noté sur stderr
+Escape hatch (controlled by the human):
+  touch ~/.claude/agent-rules.off   -> no-op, noted on stderr
 
-Tests : tests/agent-rules-tests.sh (payloads synthétiques, digest attendu).
-Pour débrancher : retirer l'entrée SubagentStart « agent-rules.py » dans
-~/.claude/settings.json ; supprimer agent-rules.py, agent-rules.json, agent-rules/.
+Tests: tests/agent-rules-tests.sh (synthetic payloads, expected digest).
+To unplug: remove the SubagentStart entry "agent-rules.py" from
+~/.claude/settings.json; delete agent-rules.py, agent-rules.json, agent-rules/.
 
-Test manuel (attendre le digest readonly) :
+Manual test (expect the readonly digest):
   echo '{"hook_event_name":"SubagentStart","agent_id":"t","agent_type":"Explore"}' | ./agent-rules.py
 """
 import json
@@ -44,7 +44,7 @@ RULES_PATH = os.path.join(HERE, "agent-rules.json")
 OFF_FILE = os.path.join(CLAUDE_DIR, "agent-rules.off")
 EVENT = "SubagentStart"
 
-# ---------------------------------------------------------------- sorties
+# ---------------------------------------------------------------- outputs
 
 
 def emit_noop():
@@ -60,7 +60,7 @@ def emit_context(text):
     sys.exit(0)
 
 
-# ---------------------------------------------------------------- utilitaires
+# ---------------------------------------------------------------- helpers
 
 
 def load_rules():
@@ -69,7 +69,7 @@ def load_rules():
 
 
 def pick_digest(agent_type, rules):
-    """Nom du digest pour un agent_type ; None si l'agent est à ignorer."""
+    """Digest name for an agent_type; None if the agent is skipped."""
     if agent_type in rules.get("skip_types", []):
         return None
     if agent_type in rules.get("readonly_types", []):
@@ -80,7 +80,7 @@ def pick_digest(agent_type, rules):
 def read_digest(name, rules):
     rel = rules.get("digests", {}).get(name)
     if not rel:
-        raise ValueError("digest %r non déclaré dans agent-rules.json" % name)
+        raise ValueError("digest %r not declared in agent-rules.json" % name)
     with open(os.path.join(HERE, rel), "r", encoding="utf-8") as f:
         return f.read().strip()
 
@@ -99,7 +99,7 @@ def main():
     if payload.get("hook_event_name") != EVENT:
         emit_noop()
     if os.path.exists(OFF_FILE):
-        sys.stderr.write("[agent-rules] ~/.claude/agent-rules.off présent : injection désactivée\n")
+        sys.stderr.write("[agent-rules] ~/.claude/agent-rules.off present: injection disabled\n")
         emit_noop()
     try:
         rules = load_rules()
@@ -109,12 +109,12 @@ def main():
             emit_noop()
         text = read_digest(name, rules)
         if not text:
-            raise ValueError("digest %r vide" % name)
+            raise ValueError("digest %r is empty" % name)
         emit_context(text)
     except SystemExit:
         raise
-    except Exception as exc:  # fail-open, mais visible
-        sys.stderr.write("[agent-rules] erreur interne, sous-agent lancé sans règles : %r\n" % (exc,))
+    except Exception as exc:  # fail-open, but visible
+        sys.stderr.write("[agent-rules] internal error, subagent started without rules: %r\n" % (exc,))
     emit_noop()
 
 

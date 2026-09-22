@@ -64,17 +64,18 @@ At each prompt, `dod-snapshot.py` records a fingerprint of the git state of the 
 `dod-check.py` detects a mutation either from that fingerprint or from the tool calls of
 the turn (Edit/Write, mutating Bash such as `sed -i`, redirections outside temp folders,
 `git commit`, `npm install`…, writing MCP tools, Artifact publishes, non-read-only
-subagents). If something changed and the last answer lacks the two markers `**Vérifié`
-and `**Non vérifié`, it returns `decision: "block"` with the expected format, so the agent
+subagents). If something changed and the last answer lacks the two markers `**Verified`
+and `**Not verified`, it returns `decision: "block"` with the expected format, so the agent
 has to name what it verified and what it did not (see `examples/CLAUDE.snippet.md`).
 *What it does not do:* mutation detection is heuristic, the fingerprint only covers the
 git repository of the session's working directory, and the answer is checked for the
 markers, not for the truth of what they say. `stop_hook_active` is honoured (no loop) and
 `__bypass_dod__` in the answer lets a turn end. `dod-snapshot.py` never blocks.
 
-Hook messages, the default digests and the DoD markers are in French; the digests and the
-rule files are plain text you can rewrite in your language (the DoD markers are matched
-literally in `dod-check.py`).
+Hook messages, the default digests and the DoD markers are in English. The digests and the
+rule files are plain text you can rewrite in your language; the DoD markers are matched
+literally (case-sensitive) and live in two constants, `VERIFIED_MARKER` and
+`NOT_VERIFIED_MARKER`, at the top of `dod-check.py`.
 
 ## Installation
 
@@ -116,7 +117,7 @@ All rules live next to the scripts, in `~/.claude/agent-guardrails/`:
 - `agent-rules.json`: `readonly_types`, `skip_types` and the `digests` map.
 - `agent-rules/readonly.md`, `agent-rules/mutating.md`: the digests themselves. They are
   examples derived from one `CLAUDE.md`; replace them with your own rules (the tests check
-  each stays under 200 words and starts with its `[Règles harnais — …]` marker).
+  each stays under 200 words and starts with its `[Harness rules — …]` marker).
 
 Each file has a `_doc` array or a header comment describing its fields.
 
@@ -167,7 +168,11 @@ irréversibles (rm récursif sur une surface protégée, force-push sur `main`, 
 modèle, dans le même tour, le lint du projet et deux anti-patterns sur le texte ajouté ;
 `agent-rules.py` injecte un digest de règles à chaque sous-agent ; `dod-snapshot.py` et
 `dod-check.py` bloquent la fin d'un tour qui a modifié quelque chose sans le bloc
-**Vérifié** / **Non vérifié, risque**. Tous laissent passer en cas d'erreur interne
+**Verified** / **Not verified, risks**. Tous laissent passer en cas d'erreur interne
 (fail-open) et ne remplacent ni un bac à sable ni un filtrage réseau. Installation :
 `./install.sh`, puis relire le bloc imprimé (ou `./install.sh --write-settings`, avec
-sauvegarde horodatée de `settings.json`). Les messages des hooks sont en français.
+sauvegarde horodatée de `settings.json`). Les messages des hooks, les digests et les
+marqueurs de la Definition of Done sont en anglais : écrivez le bloc avec `**Verified` et
+`**Not verified` tels quels (casse comprise). Pour le rédiger en français, changez les
+constantes `VERIFIED_MARKER` et `NOT_VERIFIED_MARKER` en tête de `dod-check.py` (par exemple
+`**Vérifié` et `**Non vérifié`) et le snippet de `examples/CLAUDE.snippet.md` en conséquence.

@@ -1,48 +1,48 @@
 #!/usr/bin/env python3
 """
-Garde-fou PreToolUse — refuse les actions irréversibles, même en bypass.
+PreToolUse guard: refuses irreversible actions, even in bypass mode.
 
-Pourquoi un hook : les sessions tournent en --dangerously-skip-permissions,
-sans aucune invite. Les règles permissions.deny de settings.json restent
-appliquées dans ce mode (doc permission-modes : « Deny rules block in every
-mode, including bypassPermissions », relu le 2026-09-22), mais ce sont des
-motifs statiques. Ce hook décide avec le contexte (branche courante, cwd après
-cd, profondeur sous le home, bash -c / eval) et renvoie permissionDecision=deny,
-qui empêche l'appel (doc hooks, PreToolUse decision control). Un autre hook
-PreToolUse qui réécrit les commandes (ex. RTK) tourne en parallèle et voit la
-commande d'origine, comme celui-ci.
+Why a hook: sessions run with --dangerously-skip-permissions, with no prompt
+at all. The permissions.deny rules of settings.json still apply in that mode
+(permission-modes docs: "Deny rules block in every mode, including
+bypassPermissions", reread on 2026-09-22), but they are static patterns. This
+hook decides with context (current branch, cwd after cd, depth under home,
+bash -c / eval) and returns permissionDecision=deny, which prevents the call
+(hooks docs, PreToolUse decision control). Another PreToolUse hook that
+rewrites commands (e.g. RTK) runs in parallel and sees the original command,
+like this one.
 
-Ce qu'il refuse (règles dans hooks/guard-rules.json, ce script les applique) :
-  - Bash : rm récursif sur une surface protégée (racine, home, dossier de
-    profondeur <= 3 sous le home = tout projet, volume externe de profondeur
-    <= 2, préfixes protégés comme ~/.ssh ou ~/.claude/projects, .git) ;
-    git push --force / --delete / +ref vers une branche protégée, git push
-    --mirror, git branch -D d'une branche protégée, git reset --hard,
-    git clean -f, git checkout/restore de tout l'arbre, git stash clear/drop ;
-    mkfs, dd vers /dev, diskutil erase, shutdown/reboot, npm publish,
+What it refuses (rules in hooks/guard-rules.json, this script applies them):
+  - Bash: recursive rm on a protected surface (root, home, any folder at
+    depth <= 3 under home = every project, external volume at depth <= 2,
+    protected prefixes such as ~/.ssh or ~/.claude/projects, .git);
+    git push --force / --delete / +ref to a protected branch, git push
+    --mirror, git branch -D of a protected branch, git reset --hard,
+    git clean -f, git checkout/restore of the whole tree, git stash clear/drop;
+    mkfs, dd to /dev, diskutil erase, shutdown/reboot, npm publish,
     gh repo delete, gh pr merge, docker volume rm/prune.
-  - Outils MCP : noms matchant deny_tools (exemples fournis : Hostinger destructif,
-    GitHub delete_repository / merge_pull_request / delete_file).
-  Les commandes composées (&&, ||, ;, |), les wrappers (sudo, env, et le réécriveur
-  RTK s'il est installé : rtk, rtk proxy),
-  bash -c / sh -c / eval et les cd intermédiaires sont suivis. Les corps de
-  heredoc sont ignorés (du texte, pas des commandes).
+  - MCP tools: names matching deny_tools (shipped examples: destructive
+    Hostinger tools, GitHub delete_repository / merge_pull_request / delete_file).
+  Compound commands (&&, ||, ;, |), wrappers (sudo, env, and the RTK rewriter
+  when installed: rtk, rtk proxy),
+  bash -c / sh -c / eval and intermediate cd are followed. Heredoc bodies are
+  ignored (text, not commands).
 
-Limites assumées : un `python3 -c "shutil.rmtree(...)"`, un `find -delete`
-ou un `xargs rm` ne sont pas analysés. Le but est de stopper les gestes
-autonomes catastrophiques courants, pas de résister à un contournement.
+Accepted limits: a `python3 -c "shutil.rmtree(...)"`, a `find -delete` or an
+`xargs rm` are not analysed. The goal is to stop common catastrophic
+autonomous gestures, not to resist a deliberate workaround.
 
-Escape hatch (contrôlé par l'humain, pas par le modèle) :
-  touch ~/.claude/guard.off   -> le hook laisse tout passer et le note sur stderr
-Sinon l'humain exécute la commande lui-même avec `! <cmd>` dans le prompt.
+Escape hatch (controlled by the human, not by the model):
+  touch ~/.claude/guard.off   -> the hook lets everything through and says so on stderr
+Otherwise the human runs the command themselves with `! <cmd>` in the prompt.
 
-En cas d'erreur interne le hook laisse passer (fail-open) et écrit sur stderr :
-un garde qui casse toutes les commandes en bypass serait pire que pas de garde.
+On an internal error the hook lets the call through (fail-open) and writes to
+stderr: a guard that breaks every command in bypass mode would be worse than none.
 
-Journal des refus : ~/.claude/guard.log (une ligne JSON par refus).
-Tests : tests/guard-tests.sh (payloads synthétiques, deny/allow attendus).
-Débrancher : retirer l'entrée PreToolUse
-« guard.py » dans ~/.claude/settings.json.
+Refusal log: ~/.claude/guard.log (one JSON line per refusal).
+Tests: tests/guard-tests.sh (synthetic payloads, expected deny/allow).
+To unplug: remove the PreToolUse entry
+"guard.py" from ~/.claude/settings.json.
 """
 import json
 import os
@@ -69,7 +69,7 @@ SYSTEM_TOPS = {
     "/etc", "/usr", "/opt", "/bin", "/sbin", "/var", "/home", "/dev", "/cores",
 }
 
-# ---------------------------------------------------------------- sorties
+# ---------------------------------------------------------------- outputs
 
 
 def emit_allow():
@@ -93,11 +93,11 @@ def emit_deny(reason, payload):
     except OSError:
         pass
     message = (
-        "Refusé par le garde-fou (~/.claude/hooks/guard.py) : " + reason + ". "
-        "Action irréversible ou surface protégée : elle n'est pas exécutée, même en bypass. "
-        "Ne contourne pas (ni variante de la commande, ni autre outil) : explique à l'humain "
-        "ce que tu voulais faire et laisse-le l'exécuter lui-même (`! <commande>`), "
-        "ou lui demander de créer ~/.claude/guard.off le temps de l'opération."
+        "Refused by the guard (~/.claude/hooks/guard.py): " + reason + ". "
+        "Irreversible action or protected surface: it is not executed, even in bypass mode. "
+        "Do not work around it (no variant of the command, no other tool): explain to the human "
+        "what you wanted to do and let them run it themselves (`! <command>`), "
+        "or ask them to create ~/.claude/guard.off for the duration of the operation."
     )
     out = {
         "hookSpecificOutput": {
@@ -111,7 +111,7 @@ def emit_deny(reason, payload):
     sys.exit(0)
 
 
-# ---------------------------------------------------------------- utilitaires
+# ---------------------------------------------------------------- helpers
 
 
 def load_rules():
@@ -120,7 +120,7 @@ def load_rules():
 
 
 def expand_path(p):
-    """Expand ~, $HOME, $TMPDIR ; ne touche pas aux autres variables."""
+    """Expand ~, $HOME, $TMPDIR; leaves other variables untouched."""
     p = p.strip().strip("'\"")
     if p == "~" or p.startswith("~/"):
         p = HOME + p[1:]
@@ -131,7 +131,7 @@ def expand_path(p):
 
 
 def resolve(p, cwd):
-    """Chemin absolu normalisé ; `dir/*` et `*` sont ramenés au dossier."""
+    """Normalised absolute path; `dir/*` and `*` are reduced to the folder."""
     p = expand_path(p)
     if p in ("*", "./*"):
         p = "."
@@ -143,41 +143,41 @@ def resolve(p, cwd):
 
 
 def protected_reason(path, rules):
-    """None si le rm récursif est toléré, sinon la raison du refus."""
+    """None if the recursive rm is tolerated, otherwise the reason for the refusal."""
     path = os.path.normpath(path)
     if os.path.basename(path) == ".git":
-        return "cible .git (historique du dépôt)"
+        return "target is .git (repository history)"
     for pre in rules.get("tmp_prefixes", []):
         pre = expand_path(pre).rstrip("/")
         if path == pre:
-            return "dossier temporaire racine lui-même"
+            return "the temporary root folder itself"
         if path.startswith(pre + "/"):
             return None
     if path == "/":
-        return "racine du disque"
+        return "disk root"
     if path in SYSTEM_TOPS:
-        return "dossier système"
+        return "system folder"
     if path == HOME:
-        return "dossier home"
+        return "home folder"
     for pre in rules.get("protected_prefixes", []):
         pre = os.path.normpath(expand_path(pre))
         if path == pre or path.startswith(pre + "/"):
-            return "sous %s (préfixe protégé)" % pre
+            return "under %s (protected prefix)" % pre
     if path.startswith(HOME + "/"):
         depth = len(path[len(HOME) + 1:].split("/"))
         limit = int(rules.get("home_max_depth", 3))
         if depth <= limit:
-            return "profondeur %d sous le home (tout ce qui est à <= %d niveaux est protégé : dossiers de projets inclus)" % (depth, limit)
+            return "depth %d under home (everything at <= %d levels is protected, project folders included)" % (depth, limit)
         return None
     if path.startswith("/Volumes/"):
         depth = len(path[len("/Volumes/"):].split("/"))
         limit = int(rules.get("volumes_max_depth", 2))
         if depth <= limit:
-            return "profondeur %d sur un volume externe (max protégé %d)" % (depth, limit)
+            return "depth %d on an external volume (protected up to %d)" % (depth, limit)
         return None
     depth = len(path.strip("/").split("/"))
     if depth <= 2:
-        return "chemin système peu profond"
+        return "shallow system path"
     return None
 
 
@@ -226,7 +226,7 @@ def split_segments(tokens):
 
 
 def unwrap(tokens):
-    """Retire rtk, rtk proxy (réécriveur RTK, optionnel), sudo, env VAR=x, time… pour atteindre la vraie commande."""
+    """Strips rtk, rtk proxy (optional RTK rewriter), sudo, env VAR=x, time… to reach the real command."""
     changed = True
     while tokens and changed:
         changed = False
@@ -262,7 +262,7 @@ def strip_redirections(tokens):
     return out
 
 
-# ---------------------------------------------------------------- vérifications
+# ---------------------------------------------------------------- checks
 
 
 def check_rm(args, cwd, rules):
@@ -286,7 +286,7 @@ def check_rm(args, cwd, rules):
         path = resolve(t, cwd)
         why = protected_reason(path, rules)
         if why:
-            return "rm récursif sur %s : %s" % (path, why)
+            return "recursive rm on %s: %s" % (path, why)
     return None
 
 
@@ -331,12 +331,12 @@ def check_git(args, cwd, rules):
         kind = "--force" if force else "--delete"
         if names:
             hit = [n for n in names if n in protected]
-            return "git push %s sur %s" % (kind, hit[0]) if hit else None
+            return "git push %s to %s" % (kind, hit[0]) if hit else None
         cur = current_branch(repo_dir)
         if cur is None:
-            return "git push %s sans refspec, branche courante inconnue" % kind
+            return "git push %s without refspec, current branch unknown" % kind
         if cur in protected:
-            return "git push %s sur la branche courante %s" % (kind, cur)
+            return "git push %s to the current branch %s" % (kind, cur)
         return None
 
     if sub == "branch":
@@ -349,18 +349,18 @@ def check_git(args, cwd, rules):
         return None
 
     if sub == "reset" and gitrules.get("deny_reset_hard", True) and "--hard" in rest:
-        return "git reset --hard (perte du travail non commité)"
+        return "git reset --hard (loses uncommitted work)"
 
     if sub == "clean" and gitrules.get("deny_clean_force", True):
         if "--force" in rest or any(t.startswith("-") and not t.startswith("--") and "f" in t for t in rest):
-            return "git clean -f (suppression des fichiers non suivis)"
+            return "git clean -f (deletes untracked files)"
         return None
 
     if sub in ("checkout", "restore") and gitrules.get("deny_checkout_all", True):
         if sub == "restore" and ("--staged" in rest or "-S" in rest) and "--worktree" not in rest and "-W" not in rest:
             return None
         if any(p in (".", "./", "*", ":/", ":/.") for p in positional):
-            return "git %s de tout l'arbre (perte des modifications locales)" % sub
+            return "git %s of the whole tree (loses local changes)" % sub
         return None
 
     if sub == "stash" and gitrules.get("deny_stash_clear_drop", True) and rest and rest[0] in ("clear", "drop"):
@@ -394,7 +394,7 @@ def analyze_command(cmd, cwd, rules, nesting=0):
         seg_str = " ".join(seg)
         for rx in rules.get("deny_command_regex", []):
             if re.search(rx, seg_str):
-                return "commande interdite (%s)" % seg_str[:120]
+                return "forbidden command (%s)" % seg_str[:120]
         if head == "rm":
             why = check_rm(seg[1:], cwd, rules)
             if why:
@@ -409,7 +409,7 @@ def analyze_command(cmd, cwd, rules, nesting=0):
 def check_mcp(tool_name, rules):
     for rx in rules.get("deny_tools", []):
         if re.search(rx, tool_name):
-            return "outil %s dans la liste deny_tools" % tool_name
+            return "tool %s is in the deny_tools list" % tool_name
     return None
 
 
@@ -425,7 +425,7 @@ def main():
     if not isinstance(payload, dict):
         emit_allow()
     if os.path.exists(OFF_FILE):
-        sys.stderr.write("[guard] ~/.claude/guard.off présent : garde-fou désactivé\n")
+        sys.stderr.write("[guard] ~/.claude/guard.off present: guard disabled\n")
         emit_allow()
     try:
         rules = load_rules()
@@ -441,8 +441,8 @@ def main():
             emit_deny(reason, payload)
     except SystemExit:
         raise
-    except Exception as exc:  # fail-open, mais visible
-        sys.stderr.write("[guard] erreur interne, commande laissée passer : %r\n" % (exc,))
+    except Exception as exc:  # fail-open, but visible
+        sys.stderr.write("[guard] internal error, command let through: %r\n" % (exc,))
     emit_allow()
 
 

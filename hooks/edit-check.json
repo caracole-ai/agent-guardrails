@@ -1,12 +1,12 @@
 {
   "_doc": [
-    "Règles du hook PostToolUse hooks/edit-check.py (Edit|Write) : lint per-fichier avec le linter du projet + anti-patterns CLAUDE.md sur le texte ajouté.",
-    "linters : ordre = priorité si deux configs dans le même dossier ; la config la plus proche du fichier gagne toujours. Remontée dossier par dossier depuis le fichier jusqu'à $HOME (exclu) ou /. Un config_files est une chaîne ou {name, contains} (contains : sous-chaîne exigée dans le fichier, ex. [tool.ruff).",
-    "bin_path : cherché en remontant depuis le dossier de la config (couvre le hoisting npm-workspaces). Config sans binaire = pas de lint ; binaire transitif sans config = pas de lint. Rien de global n'est supposé sur le PATH.",
-    "Codes de sortie du linter : 1 = findings renvoyés au modèle ; 0 = propre ; autre (2, 126, 127), timeout, lancement impossible = le linter n'a pas pu tourner -> rien côté modèle, une ligne stderr.",
-    "antipatterns.rules : regex ligne par ligne sur le texte ajouté (Edit.new_string / Write.content), jamais sur le fichier relu. unless_line_regex : la ligne est ignorée si elle matche. skip_comment_lines : ignore les lignes commençant par //, #, *, /*.",
-    "antipatterns.exclude_path_regex ne s'applique qu'aux anti-patterns (le lint tourne aussi sur les tests et les configs).",
-    "Toujours informatif (additionalContext), jamais bloquant. Kill-switch : touch ~/.claude/edit-check.off."
+    "Rules of the PostToolUse hook hooks/edit-check.py (Edit|Write): per-file lint with the project's linter + CLAUDE.md anti-patterns on the added text.",
+    "linters: order = priority when two configs sit in the same folder; the config nearest to the file always wins. Walks up folder by folder from the file to $HOME (excluded) or /. A config_files entry is a string or {name, contains} (contains: substring required in the file, e.g. [tool.ruff).",
+    "bin_path: looked up walking upwards from the config folder (covers npm-workspaces hoisting). Config without binary = no lint; transitive binary without config = no lint. Nothing global is assumed on PATH.",
+    "Linter exit codes: 1 = findings sent to the model; 0 = clean; anything else (2, 126, 127), a timeout or a failed start = the linter could not run -> nothing for the model, one line on stderr.",
+    "antipatterns.rules: line-by-line regexes on the added text (Edit.new_string / Write.content), never on the re-read file. unless_line_regex: the line is skipped if it matches. skip_comment_lines: skips lines starting with //, #, *, /*.",
+    "antipatterns.exclude_path_regex only applies to the anti-patterns (lint also runs on tests and configs).",
+    "Always informative (additionalContext), never blocking. Kill switch: touch ~/.claude/edit-check.off."
   ],
   "timeout_s": 8,
   "max_lines": 40,
@@ -55,13 +55,13 @@
         "extensions": ["ts", "tsx", "js", "jsx", "mjs", "cjs", "vue", "svelte", "astro"],
         "regex": "(process\\.env(\\.[A-Za-z_][A-Za-z0-9_]*|\\[[\"'][^\"']+[\"']\\])|import\\.meta\\.env\\.[A-Za-z_][A-Za-z0-9_]*)\\s*(\\?\\?|\\|\\|)",
         "unless_line_regex": "NODE_ENV",
-        "message": "fallback env var silencieux — assertEnv() qui throw au boot, ou gater NODE_ENV !== 'production' (CLAUDE.md « Silent fallbacks »)"
+        "message": "silent env var fallback: use an assertEnv() that throws at boot, or gate on NODE_ENV !== 'production' (CLAUDE.md \"Silent fallbacks\")"
       },
       {
         "id": "env-fallback-py",
         "extensions": ["py", "pyi"],
         "regex": "os\\.(environ\\.get|getenv)\\(\\s*[\"'][^\"']+[\"']\\s*,(?!\\s*(default\\s*=\\s*)?None\\s*\\))|os\\.(environ\\.get|getenv)\\([^)]*\\)\\s*or\\s+",
-        "message": "fallback env var silencieux — lever une erreur au démarrage si la variable manque, ou gater l'environnement de dev (CLAUDE.md « Silent fallbacks »)"
+        "message": "silent env var fallback: raise an error at startup when the variable is missing, or gate on the dev environment (CLAUDE.md \"Silent fallbacks\")"
       },
       {
         "id": "local-url",
@@ -69,7 +69,7 @@
         "regex": "https?://(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)(:\\d+)?",
         "unless_line_regex": "NODE_ENV",
         "skip_comment_lines": true,
-        "message": "URL locale en dur — importer depuis la config (CLAUDE.md « No hardcoded values »)"
+        "message": "hard-coded local URL: import it from the config (CLAUDE.md \"No hardcoded values\")"
       }
     ]
   }

@@ -1,12 +1,12 @@
 {
   "_doc": [
-    "Règles appliquées par hooks/guard.py (PreToolUse, refus même en bypass).",
-    "deny_tools : regex sur le nom complet de l'outil MCP (mcp__<serveur>__<nom>).",
-    "deny_command_regex : regex sur chaque segment Bash (après retrait de sudo/env/rtk).",
-    "rm récursif : refusé si la cible est /, un dossier système, le home, un chemin à <= home_max_depth niveaux sous le home (tout dossier de projet), un volume à <= volumes_max_depth niveaux, un préfixe protégé, ou .git. Toléré sous tmp_prefixes.",
-    "git : push --force/--delete/+ref/--mirror vers protected_branches (ou branche courante si pas de refspec), branch -D d'une branche protégée, et les options du bloc git.",
-    "deny_tools fournis : exemples (serveurs MCP Hostinger et GitHub) ; adaptez-les à vos serveurs MCP.",
-    "Désactivation temporaire par l'humain : touch ~/.claude/guard.off. Journal : ~/.claude/guard.log."
+    "Rules applied by hooks/guard.py (PreToolUse, refuses even in bypass mode).",
+    "deny_tools: regexes on the full MCP tool name (mcp__<server>__<name>).",
+    "deny_command_regex: regexes on each Bash segment (after stripping sudo/env/rtk).",
+    "Recursive rm: refused when the target is /, a system folder, home, a path at <= home_max_depth levels under home (every project folder), a volume at <= volumes_max_depth levels, a protected prefix, or .git. Tolerated under tmp_prefixes.",
+    "git: push --force/--delete/+ref/--mirror to protected_branches (or to the current branch when there is no refspec), branch -D of a protected branch, and the switches of the git block.",
+    "Shipped deny_tools are examples (Hostinger and GitHub MCP servers); adapt them to your own MCP servers.",
+    "Temporary disabling by the human: touch ~/.claude/guard.off. Log: ~/.claude/guard.log."
   ],
   "protected_branches": ["main", "master", "prod", "production", "release"],
   "home_max_depth": 3,

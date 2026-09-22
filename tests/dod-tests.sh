@@ -1,8 +1,8 @@
 #!/bin/bash
-# Tests DoD v2 — hooks/dod-snapshot.py (UserPromptSubmit) + hooks/dod-check.py (Stop).
-# Usage : tests/dod-tests.sh   (DOD_SCRIPTS=<dossier> pour tester une autre copie des scripts,
-#         par défaut le dossier hooks/ du dépôt)
-# Tout est écrit dans un dossier temporaire hors de tout dépôt git, supprimé en fin de run.
+# DoD v2 tests: hooks/dod-snapshot.py (UserPromptSubmit) + hooks/dod-check.py (Stop).
+# Usage: tests/dod-tests.sh   (DOD_SCRIPTS=<folder> to test another copy of the scripts,
+#        the repository's hooks/ folder by default)
+# Everything is written to a temporary folder outside any git repository, deleted at the end of the run.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS="${DOD_SCRIPTS:-$(cd "$HERE/../hooks" && pwd)}"
@@ -42,13 +42,13 @@ def text(t):
     return {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": t}]}}
 
 
-FAIT = "Fait."
-DOD = "**Vérifié** : /x. **Non vérifié, risque** : rien."
+DONE = "Done."
+DOD = "**Verified**: /x. **Not verified, risks**: nothing."
 EDIT = {"file_path": "/x", "old_string": "a", "new_string": "b"}
 
 
-def turn(tool, inp, final=FAIT):
-    return [user("fais"), tool_use(tool, inp), tool_result(), text(final)]
+def turn(tool, inp, final=DONE):
+    return [user("do it"), tool_use(tool, inp), tool_result(), text(final)]
 
 
 def write_transcript(name, entries):
@@ -85,25 +85,25 @@ def check(name, entries, expect, session_id="dodv2-nosnap", cwd=here, stop_hook_
     return reason
 
 
-print("=== (a) scan du transcript ===")
-check("edit_sans_dod", turn("Edit", EDIT), "block")
-check("edit_avec_dod", turn("Edit", EDIT, DOD), "pass")
+print("=== (a) transcript scan ===")
+check("edit_without_dod", turn("Edit", EDIT), "block")
+check("edit_with_dod", turn("Edit", EDIT, DOD), "pass")
 check("bash_sed_i", turn("Bash", {"command": "sed -i 's/a/b/' /x"}), "block")
 check("bash_redirect_tmp", turn("Bash", {"command": "echo x > /tmp/y"}), "pass")
-check("bash_lecture_pipe", turn("Bash", {"command": "cat /etc/hosts | grep a"}), "pass")
+check("bash_read_pipe", turn("Bash", {"command": "cat /etc/hosts | grep a"}), "pass")
 check("bash_git_commit", turn("Bash", {"command": "git commit -m x"}), "block")
 check("mcp_github_push_files", turn("mcp__plugin_github_github__push_files", {}), "block")
 check("mcp_jcodemunch_get_symbol", turn("mcp__jcodemunch__get_symbol", {"repo": "r", "symbol_id": "s"}), "pass")
 check("mcp_jcodemunch_index_folder", turn("mcp__jcodemunch__index_folder", {"path": "."}), "pass")
 check("artifact_read", turn("Artifact", {"action": "read", "url": "u"}), "pass")
-check("artifact_sans_action", turn("Artifact", {"file_path": "/x.html"}), "block")
+check("artifact_without_action", turn("Artifact", {"file_path": "/x.html"}), "block")
 check("agent_explore", turn("Agent", {"subagent_type": "Explore", "prompt": "p", "description": "d"}), "pass")
 check("agent_general_purpose", turn("Agent", {"subagent_type": "general-purpose", "prompt": "p", "description": "d"}), "block")
-check("tour_sans_outil", [user("salut"), text(FAIT)], "pass")
+check("turn_without_tool", [user("hi"), text(DONE)], "pass")
 check("stop_hook_active", turn("Edit", EDIT), "pass", stop_hook_active=True)
-check("bypass_keyword", turn("Edit", EDIT, "Fait. __bypass_dod__"), "pass")
+check("bypass_keyword", turn("Edit", EDIT, "Done. __bypass_dod__"), "pass")
 
-print("=== (a bis) cas limites Bash / MCP ===")
+print("=== (a bis) Bash / MCP edge cases ===")
 check("bash_rtk_proxy_ls", turn("Bash", {"command": "rtk proxy ls -la /Users/someone"}), "pass")
 check("bash_cd_and_rm_dist", turn("Bash", {"command": "cd /p && rm -rf ./dist"}), "block")
 check("bash_var_scratchpad", turn("Bash", {"command": 'S=/private/tmp/x/scratchpad; mkdir -p "$S/a" && echo 1 > "$S/a/f"'}), "pass")
@@ -130,10 +130,10 @@ check("mcp_docs_read", turn("mcp__claude_ai_Claude_Docs__read", {}), "pass")
 check("mcp_docs_batch", turn("mcp__claude_ai_Claude_Docs__batch", {}), "block")
 check("mcp_chrome_navigate", turn("mcp__claude-in-chrome__navigate", {"url": "u"}), "pass")
 check("mcp_context7_resolve", turn("mcp__plugin_context7_context7__resolve-library-id", {}), "pass")
-check("agent_sans_type", turn("Agent", {"prompt": "p", "description": "d"}), "block")
+check("agent_without_type", turn("Agent", {"prompt": "p", "description": "d"}), "block")
 check("agent_guide", turn("Agent", {"subagent_type": "claude-code-guide", "prompt": "p", "description": "d"}), "pass")
 
-print("=== (b) empreinte git ===")
+print("=== (b) git fingerprint ===")
 repo = os.path.join(work, "repo")
 shutil.rmtree(repo, ignore_errors=True)
 os.makedirs(repo)
@@ -166,36 +166,36 @@ record("snapshot_git_fingerprint_non_null",
        "code=%s out=%r err=%r snap=%s" % (code, out, err, snap))
 with open(os.path.join(repo, "f.txt"), "a") as f:
     f.write("b\n")
-reason = check("fp_modif_tracked_sans_dod", [user("x"), text(FAIT)], "block", session_id="dodv2-fp", cwd=repo)
-record("fp_modif_tracked_declencheur_empreinte", "empreinte git modifiée" in reason, reason[:160])
-check("fp_modif_tracked_avec_dod", [user("x"), text(DOD)], "pass", session_id="dodv2-fp", cwd=repo)
+reason = check("fp_tracked_change_without_dod", [user("x"), text(DONE)], "block", session_id="dodv2-fp", cwd=repo)
+record("fp_tracked_change_trigger_is_fingerprint", "git fingerprint changed" in reason, reason[:160])
+check("fp_tracked_change_with_dod", [user("x"), text(DOD)], "pass", session_id="dodv2-fp", cwd=repo)
 snapshot("dodv2-fp", repo)
-check("fp_sans_modif", [user("x"), text(FAIT)], "pass", session_id="dodv2-fp", cwd=repo)
+check("fp_no_change", [user("x"), text(DONE)], "pass", session_id="dodv2-fp", cwd=repo)
 with open(os.path.join(repo, "new.txt"), "w") as f:
     f.write("n\n")
-check("fp_nouveau_fichier_untracked", [user("x"), text(FAIT)], "block", session_id="dodv2-fp", cwd=repo)
+check("fp_new_untracked_file", [user("x"), text(DONE)], "block", session_id="dodv2-fp", cwd=repo)
 snapshot("dodv2-fp", repo)
 os.makedirs(os.path.join(repo, "build"))
 with open(os.path.join(repo, "build", "out.js"), "w") as f:
     f.write("//\n")
-check("fp_fichier_gitignore_ignore", [user("x"), text(FAIT)], "pass", session_id="dodv2-fp", cwd=repo)
+check("fp_gitignored_file_ignored", [user("x"), text(DONE)], "pass", session_id="dodv2-fp", cwd=repo)
 sub = os.path.join(repo, "sub")
 os.makedirs(sub)
 snapshot("dodv2-fp", sub)
 with open(os.path.join(repo, "f.txt"), "a") as f:
     f.write("c\n")
-check("fp_cwd_sous_dossier", [user("x"), text(FAIT)], "block", session_id="dodv2-fp", cwd=sub)
+check("fp_cwd_subfolder", [user("x"), text(DONE)], "block", session_id="dodv2-fp", cwd=sub)
 
 code, out, err, snap = snapshot("dodv2-nogit", nogit)
-record("snapshot_hors_git_fingerprint_null",
+record("snapshot_outside_git_fingerprint_null",
        code == 0 and out.strip() == "{}" and not err and bool(snap) and snap.get("fingerprint") is None,
        "code=%s out=%r err=%r snap=%s" % (code, out, err, snap))
-check("nogit_edit_retombe_sur_B", turn("Edit", EDIT), "block", session_id="dodv2-nogit", cwd=nogit)
-check("nogit_sans_outil", [user("x"), text(FAIT)], "pass", session_id="dodv2-nogit", cwd=nogit)
-check("snapshot_absent_edit", turn("Edit", EDIT), "block", session_id="dodv2-jamais-vu", cwd=repo)
+check("nogit_edit_falls_back_on_B", turn("Edit", EDIT), "block", session_id="dodv2-nogit", cwd=nogit)
+check("nogit_without_tool", [user("x"), text(DONE)], "pass", session_id="dodv2-nogit", cwd=nogit)
+check("snapshot_missing_edit", turn("Edit", EDIT), "block", session_id="dodv2-never-seen", cwd=repo)
 
-print("=== (c) robustesse ===")
-for label, payload in (("stdin_vide", b""), ("stdin_invalide", b"{not json")):
+print("=== (c) robustness ===")
+for label, payload in (("empty_stdin", b""), ("invalid_stdin", b"{not json")):
     code, out, err = run(SNAP, payload)
     record("snapshot_" + label, code == 0 and out.strip() == "{}" and not err, "code=%s out=%r err=%r" % (code, out, err))
     code, out, err = run(CHECK, payload)
@@ -206,7 +206,7 @@ for script in (SNAP, CHECK):
     record(os.path.basename(script) + "_executable_shebang",
            os.access(script, os.X_OK) and first == "#!/usr/bin/env python3", "x=%s shebang=%r" % (os.access(script, os.X_OK), first))
 
-# nettoyage
+# cleanup
 shutil.rmtree(work, ignore_errors=True)
 for sid in ("dodv2-fp", "dodv2-nogit"):
     try:
