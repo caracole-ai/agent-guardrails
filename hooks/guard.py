@@ -93,7 +93,7 @@ def emit_deny(reason, payload):
     except OSError:
         pass
     message = (
-        "Refused by the guard (~/.claude/hooks/guard.py): " + reason + ". "
+        "Refused by the guard (agent-guardrails/guard.py): " + reason + ". "
         "Irreversible action or protected surface: it is not executed, even in bypass mode. "
         "Do not work around it (no variant of the command, no other tool): explain to the human "
         "what you wanted to do and let them run it themselves (`! <command>`), "
