@@ -1,0 +1,38 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.9"
+          - os: macos-latest
+            python: "3.12"
+    runs-on: ${{ matrix.os }}
+    env:
+      # the guard tests create throwaway commits
+      GIT_AUTHOR_NAME: ci
+      GIT_AUTHOR_EMAIL: ci@example.invalid
+      GIT_COMMITTER_NAME: ci
+      GIT_COMMITTER_EMAIL: ci@example.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Tools
+        run: python3 --version && jq --version && git --version && bash --version | head -1
+      - name: guard-tests
+        run: tests/guard-tests.sh
+      - name: edit-check-tests
+        run: tests/edit-check-tests.sh
+      - name: agent-rules-tests
+        run: tests/agent-rules-tests.sh
+      - name: dod-tests
+        run: tests/dod-tests.sh

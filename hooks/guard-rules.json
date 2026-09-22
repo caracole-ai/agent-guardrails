@@ -1,0 +1,49 @@
+{
+  "_doc": [
+    "Règles appliquées par hooks/guard.py (PreToolUse, refus même en bypass).",
+    "deny_tools : regex sur le nom complet de l'outil MCP (mcp__<serveur>__<nom>).",
+    "deny_command_regex : regex sur chaque segment Bash (après retrait de sudo/env/rtk).",
+    "rm récursif : refusé si la cible est /, un dossier système, le home, un chemin à <= home_max_depth niveaux sous le home (tout dossier de projet), un volume à <= volumes_max_depth niveaux, un préfixe protégé, ou .git. Toléré sous tmp_prefixes.",
+    "git : push --force/--delete/+ref/--mirror vers protected_branches (ou branche courante si pas de refspec), branch -D d'une branche protégée, et les options du bloc git.",
+    "deny_tools fournis : exemples (serveurs MCP Hostinger et GitHub) ; adaptez-les à vos serveurs MCP.",
+    "Désactivation temporaire par l'humain : touch ~/.claude/guard.off. Journal : ~/.claude/guard.log."
+  ],
+  "protected_branches": ["main", "master", "prod", "production", "release"],
+  "home_max_depth": 3,
+  "volumes_max_depth": 2,
+  "protected_prefixes": [
+    "~/.ssh",
+    "~/.gnupg",
+    "~/.claude/projects",
+    "~/.claude/hooks",
+    "~/.claude/agent-guardrails"
+  ],
+  "tmp_prefixes": ["/tmp", "/private/tmp", "/var/folders", "$TMPDIR"],
+  "git": {
+    "deny_reset_hard": true,
+    "deny_clean_force": true,
+    "deny_checkout_all": true,
+    "deny_stash_clear_drop": true
+  },
+  "deny_command_regex": [
+    "^mkfs(\\.|\\s)",
+    "^dd\\s.*\\bof=/dev/",
+    "^diskutil\\s+(erase\\w*|partition\\w*|reformat|zeroDisk|secureErase|randomDisk)\\b",
+    "^(shutdown|reboot|halt)\\b",
+    ">\\s*/dev/r?disk",
+    "^(npm|pnpm|yarn)\\s+publish\\b",
+    "^gh\\s+repo\\s+delete\\b",
+    "^gh\\s+pr\\s+merge\\b",
+    "^docker\\s+volume\\s+(rm|prune)\\b",
+    "^docker\\s+system\\s+prune\\b.*--volumes"
+  ],
+  "deny_tools": [
+    "^mcp__hostinger__VPS_(recreateVirtualMachine|restoreBackup|restoreSnapshot|purchaseNewVirtualMachine|setupPurchasedVirtualMachine|setRootPassword|setPanelPassword|deleteProject|deleteSnapshot|deleteFirewall|deleteFirewallRule|deletePublicKey|deletePTRRecord|deletePostInstallScript|startRecoveryMode|stopVirtualMachine|stopProject)",
+    "^mcp__hostinger__DNS_(resetDNSRecords|deleteDNSRecords|restoreDNSSnapshot)",
+    "^mcp__hostinger__domains_(purchaseNewDomain|updateDomainNameservers|disableDomainLock|disablePrivacyProtection|deleteDomainForwarding|deleteWHOISProfile)",
+    "^mcp__hostinger__billing_(createServiceOrder|deletePaymentMethod|disableAutoRenewal|setDefaultPaymentMethod)",
+    "^mcp__hostinger__hosting_importWordpressWebsite",
+    "^mcp__hostinger__reach_deleteAContact",
+    "^mcp__plugin_github_github__(delete_repository|merge_pull_request|delete_file)$"
+  ]
+}

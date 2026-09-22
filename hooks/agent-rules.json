@@ -1,0 +1,23 @@
+{
+  "_doc": [
+    "Règles du hook SubagentStart hooks/agent-rules.py : quel digest injecter selon agent_type.",
+    "agent_type = subagent_type de l'appel Agent (Explore, Plan, general-purpose, claude-code-guide, feature-dev:code-reviewer, fork…).",
+    "readonly_types : agents de recherche/plan sans droit d'écriture -> agent-rules/readonly.md.",
+    "skip_types : aucune injection (fork hérite déjà de tout le contexte parent ; statusline-setup est cadré).",
+    "Tout autre agent_type, y compris absent, vide ou inconnu -> agent-rules/mutating.md (surensemble, sûr par défaut).",
+    "Chemins des digests relatifs au dossier hooks/. Chaque digest <= 200 mots (vérifié par tests/agent-rules-tests.sh). Les digests fournis sont des exemples tirés d'un CLAUDE.md : remplacez-les par vos propres règles."
+  ],
+  "readonly_types": [
+    "Explore",
+    "Plan",
+    "claude-code-guide",
+    "feature-dev:code-explorer",
+    "feature-dev:code-architect",
+    "feature-dev:code-reviewer"
+  ],
+  "skip_types": ["fork", "statusline-setup"],
+  "digests": {
+    "readonly": "agent-rules/readonly.md",
+    "mutating": "agent-rules/mutating.md"
+  }
+}
