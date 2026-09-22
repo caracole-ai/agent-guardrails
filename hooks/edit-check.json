@@ -1,0 +1,76 @@
+{
+  "_doc": [
+    "Rules of the PostToolUse hook hooks/edit-check.py (Edit|Write): per-file lint with the project's linter + CLAUDE.md anti-patterns on the added text.",
+    "linters: order = priority when two configs sit in the same folder; the config nearest to the file always wins. Walks up folder by folder from the file to $HOME (excluded) or /. A config_files entry is a string or {name, contains} (contains: substring required in the file, e.g. [tool.ruff).",
+    "bin_path: looked up walking upwards from the config folder (covers npm-workspaces hoisting). Config without binary = no lint; transitive binary without config = no lint. Nothing global is assumed on PATH.",
+    "Linter exit codes: 1 = findings sent to the model; 0 = clean; anything else (2, 126, 127), a timeout or a failed start = the linter could not run -> nothing for the model, one line on stderr.",
+    "antipatterns.rules: line-by-line regexes on the added text (Edit.new_string / Write.content), never on the re-read file. unless_line_regex: the line is skipped if it matches. skip_comment_lines: skips lines starting with //, #, *, /*.",
+    "antipatterns.exclude_path_regex only applies to the anti-patterns (lint also runs on tests and configs).",
+    "Always informative (additionalContext), never blocking. Kill switch: touch ~/.claude/edit-check.off."
+  ],
+  "timeout_s": 8,
+  "max_lines": 40,
+  "max_bytes": 3000,
+  "max_findings": 10,
+  "linters": [
+    {
+      "id": "biome",
+      "config_files": ["biome.json", "biome.jsonc"],
+      "extensions": ["ts", "tsx", "js", "jsx", "mjs", "cjs", "vue", "svelte", "astro"],
+      "bin_path": "node_modules/.bin/biome",
+      "args": ["lint", "--reporter=concise", "--max-diagnostics=20", "--no-errors-on-unmatched"]
+    },
+    {
+      "id": "eslint",
+      "config_files": [
+        "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs",
+        "eslint.config.ts", "eslint.config.mts", "eslint.config.cts"
+      ],
+      "extensions": ["ts", "tsx", "js", "jsx", "mjs", "cjs", "vue"],
+      "bin_path": "node_modules/.bin/eslint",
+      "args": ["--no-warn-ignored"]
+    },
+    {
+      "id": "ruff",
+      "config_files": [{"name": "pyproject.toml", "contains": "[tool.ruff"}, "ruff.toml", ".ruff.toml"],
+      "extensions": ["py", "pyi"],
+      "bin_path": ".venv/bin/ruff",
+      "args": ["check", "--no-cache", "--output-format", "concise"]
+    }
+  ],
+  "antipatterns": {
+    "exclude_path_regex": [
+      "\\.(test|spec)\\.[cm]?[jt]sx?$",
+      "(^|/)__tests__/",
+      "(^|/)tests?/",
+      "(^|/)test_[^/]*\\.py$",
+      "_test\\.py$",
+      "(^|/)conftest\\.py$",
+      "(^|/)(vite|vitest|nuxt|next|playwright|jest|astro|webpack|tailwind|drizzle|eslint|biome)\\.config\\.[cm]?[jt]s$",
+      "/\\.claude/(hooks|agent-guardrails)/"
+    ],
+    "rules": [
+      {
+        "id": "env-fallback-js",
+        "extensions": ["ts", "tsx", "js", "jsx", "mjs", "cjs", "vue", "svelte", "astro"],
+        "regex": "(process\\.env(\\.[A-Za-z_][A-Za-z0-9_]*|\\[[\"'][^\"']+[\"']\\])|import\\.meta\\.env\\.[A-Za-z_][A-Za-z0-9_]*)\\s*(\\?\\?|\\|\\|)",
+        "unless_line_regex": "NODE_ENV",
+        "message": "silent env var fallback: use an assertEnv() that throws at boot, or gate on NODE_ENV !== 'production' (CLAUDE.md \"Silent fallbacks\")"
+      },
+      {
+        "id": "env-fallback-py",
+        "extensions": ["py", "pyi"],
+        "regex": "os\\.(environ\\.get|getenv)\\(\\s*[\"'][^\"']+[\"']\\s*,(?!\\s*(default\\s*=\\s*)?None\\s*\\))|os\\.(environ\\.get|getenv)\\([^)]*\\)\\s*or\\s+",
+        "message": "silent env var fallback: raise an error at startup when the variable is missing, or gate on the dev environment (CLAUDE.md \"Silent fallbacks\")"
+      },
+      {
+        "id": "local-url",
+        "extensions": ["ts", "tsx", "js", "jsx", "mjs", "cjs", "vue", "svelte", "astro", "py", "pyi"],
+        "regex": "https?://(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)(:\\d+)?",
+        "unless_line_regex": "NODE_ENV",
+        "skip_comment_lines": true,
+        "message": "hard-coded local URL: import it from the config (CLAUDE.md \"No hardcoded values\")"
+      }
+    ]
+  }
+}

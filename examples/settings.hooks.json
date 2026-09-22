@@ -1,0 +1,66 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/agent-guardrails/guard.py",
+            "timeout": 5,
+            "statusMessage": "Guard..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/agent-guardrails/edit-check.py",
+            "timeout": 10,
+            "statusMessage": "Edit check..."
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/agent-guardrails/agent-rules.py",
+            "timeout": 5,
+            "statusMessage": "Subagent rules..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/agent-guardrails/dod-snapshot.py",
+            "timeout": 5,
+            "statusMessage": "DoD snapshot..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/agent-guardrails/dod-check.py",
+            "timeout": 10,
+            "statusMessage": "Definition of Done check..."
+          }
+        ]
+      }
+    ]
+  }
+}

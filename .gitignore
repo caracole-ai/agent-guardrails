@@ -1,0 +1,4 @@
+# Written by the hooks next to their own folder when run from the repository (tests)
+*.off
+*.log
+__pycache__/
